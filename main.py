@@ -1,14 +1,14 @@
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 _ = load_dotenv()
 
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END # type: ignore
 from typing import TypedDict, Annotated
 import operator
-from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage, ToolMessage
-from langchain_openai import ChatOpenAI
-from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage, ToolMessage # type: ignore
+from langchain_openai import ChatOpenAI # type: ignore
+from langchain_community.tools.tavily_search import TavilySearchResults # type: ignore
 from search_agent import SearchAgent, AgentState  # Importing AgentState from search_agent
-from source_analysis_agent import SummarySentimentAgent  # Import the second agent
+from summary_agent import SummaryAgent  # type: ignore # Import the second agent
 
 # Define system prompt for SearchAgent
 search_prompt = """You are a smart and efficient research assistant working for a PR firm. 
