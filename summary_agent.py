@@ -16,25 +16,27 @@ tool = TavilySearchResults(max_results=5)
 
 class AgentState(TypedDict):
     messages: Annotated[list[AnyMessage], operator.add]
+    urls: list[str]
+    current_index: int
+    chosen_articles: list[str]
 
 class SummaryAgent:
     def __init__(self, model, tools, system=""):
         self.system = system
         graph = StateGraph(AgentState)
         
+        # define graph nodes
         graph.add_node("fetch_content", self.fetch_content)
         graph.add_node("summarize", self.summarize_content)
+        graph.add_node("human_review", self.human_review)
         
-        graph.add_edge("fetch_content", "summarize")
+        # define graph edges
+        graph.add_conditional_edges("fetch_content", self.has_more_urls, {True: "summarize", False: END})
         graph.add_edge("summarize", "human_review")
-        
-        """
-        - add a conditional edge for: if there are links left to look at, take action, otherwise end
-        - make a loop called take_action and mirror search_agent
-        """
-                
+        graph.add_edge("human_review", "fetch_content")
+
+        # set an entry point for the graph        
         graph.set_entry_point("fetch_content")
-        
 
         # compile graph and provide associated tools
         self.graph = graph.compile()
