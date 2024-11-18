@@ -57,11 +57,9 @@ class SearchAgent:
             tool_calls = state['messages'][-1].tool_calls       
             results = []
             for t in tool_calls:                                
-                if not t['name'] in self.tools:                 
-                    print("\n ....bad tool name....")           
+                if not t['name'] in self.tools:                            
                     result = "bad tool name, retry"             
                 else:               
                     result = self.tools[t['name']].invoke(t['args']) 
                 results.append(ToolMessage(tool_call_id=t['id'], name=t['name'], content=str(result))) 
-            print("Back to the model!")
             return {'messages': results}
