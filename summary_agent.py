@@ -25,7 +25,6 @@ class SummaryAgent:
         graph.add_node("fetch_content", self.fetch_content)
         graph.add_node("summarize", self.summarize_content)
         
-
         graph.add_edge("fetch_content", "summarize")
         graph.add_edge("summarize", "human_review")
         
