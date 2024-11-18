@@ -27,13 +27,13 @@ class SummaryAgent:
         
         # define graph nodes
         graph.add_node("fetch_content", self.fetch_content)
-        graph.add_node("summarize", self.summarize_content)
-        graph.add_node("human_review", self.human_review)
+        # graph.add_node("summarize", self.summarize_content)
+        # graph.add_node("human_review", self.human_review)
         
         # define graph edges
-        graph.add_conditional_edges("fetch_content", self.has_more_urls, {True: "summarize", False: END})
-        graph.add_edge("summarize", "human_review")
-        graph.add_edge("human_review", "fetch_content")
+        # graph.add_conditional_edges("fetch_content", self.has_more_urls, {True: "summarize", False: END})
+        # graph.add_edge("summarize", "human_review")
+        # graph.add_edge("human_review", "fetch_content")
 
         # set an entry point for the graph        
         graph.set_entry_point("fetch_content")
@@ -44,9 +44,23 @@ class SummaryAgent:
         self.model = model.bind_tools(tools)
 
     def fetch_content(self, state):
-        """Fetches the content from each URL in the input list and saves it to the state."""
-        
-        return 
+        """Fetches the content from the current URL and saves it to the state."""
+        url = state["urls"][state["current_index"]]
+        print(f"Fetching content from URL: {url}")  # Debug print statement
+
+        # Invoke the tool to get the content
+        response = self.tools['tavily_search_results_json'].invoke({"query": url})
+
+        # Save content to state and add print for debugging
+        state["content"] = response.get("content", "")
+        if state["content"]:
+            print("Content successfully fetched:")
+            print(state["content"][:500])  # Print the first 500 characters for verification
+        else:
+            print("No content found for this URL.")
+
+        return state
+
 
     def summarize_content(self, state):
         """Summarizes the article content (or first X characters?)."""
@@ -61,3 +75,19 @@ class SummaryAgent:
 """
 Consider how output will be received by next agent
 """
+
+summary_prompt = """You are a smart and efficient research assistant working for a PR firm. 
+You are being provided content from an article, and you need to generate a summary about this content. In your summary, only provide information
+relative to the provided context. Do not hallucinate or make up any information. Only summarize what is provided."""
+
+model = ChatOpenAI(model="gpt-4o")
+search_params = {
+    'filter': {
+        'date': 'last_30_days',  
+        'type': 'article'
+    }
+}
+tool = TavilySearchResults(max_results=5, search_params=search_params)
+search_agent = SummaryAgent(model, [tool], system=summary_prompt)
+query = "Public perception of Angel Reese recent performances"
+messages = [HumanMessage(content=query)]
