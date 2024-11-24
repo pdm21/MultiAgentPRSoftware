@@ -36,7 +36,7 @@ class SummaryAgent:
         """Fetches the content from the current URL and saves it to the state."""
         url = state["urls"][state["current_index"]]
         print(f"Fetching content from URL: {url}")  # Debug print statement
-        
+
         # Invoke the tool to get the content
         response = self.tools['tavily_search_results_json'].invoke({"query": url})
 
@@ -44,7 +44,7 @@ class SummaryAgent:
         if isinstance(response, list) and len(response) > 0 and isinstance(response[0], dict):
             state["content"] = response[0].get("content", "")
             print("Content successfully fetched:")
-            print(state["content"][:5000])  # Print the first 500 characters for verification
+            print(state["content"][:500])  # Print the first 500 characters for verification
             print("Number of characters in content:", len(state["content"]))  # Print character count
 
         else:
