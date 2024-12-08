@@ -7,14 +7,14 @@ from typing import Generator, Union, Dict, Any
 from dotenv import load_dotenv
 import os
 
-load_dotenv() 
+load_dotenv()
 api_key = os.getenv('PERPLEXITY_API_KEY')
 
 # ----------------------------------------------------------------
 def make_perplexity_api_call(
-    api_key: str, 
-    model: str, 
-    user_message: str, 
+    api_key: str,
+    model: str,
+    user_message: str,
     stream: bool = False,
     temperature: float = 0.2,
     max_tokens: int = 1000
@@ -57,12 +57,7 @@ def _stream_response(url: str, payload: dict, headers: dict) -> Generator[str, N
         logging.error(f"Stream request failed: {e}")
         yield f"Error: {str(e)}"
 
-
-def _normal_response(
-    url: str, 
-    payload: dict, 
-    headers: dict
-) -> Dict[str, Any]:
+def _normal_response(url: str, payload: dict, headers: dict) -> Dict[str, Any]:
     try:
         response = requests.post(url, json=payload, headers=headers)
         response.raise_for_status()
@@ -71,22 +66,32 @@ def _normal_response(
         logging.error(f"Normal request failed: {e}")
         return {"error": f"Request error: {str(e)}"}
 
+def fetch_recent_articles(api_key: str, athlete: str, max_results: int = 10) -> list:
+    query = f"Find the {max_results} most recent articles about {athlete}."
+    response = make_perplexity_api_call(
+        api_key,
+        "llama-3.1-sonar-small-128k-online",
+        query,
+        stream=False
+    )
 
-# Streaming Response
-streaming_response = make_perplexity_api_call(
-    api_key, 
-    "llama-3.1-sonar-small-128k-online", 
-    "What is the latest news on the Indiana Pacers?", 
-    stream=True
-)
-for chunk in streaming_response:
-    print(chunk, end='', flush=True)
+    articles = []
+    if "choices" in response:
+        content = response['choices'][0]['message']['content']
+        try:
+            # Assuming the response is a plain-text list of articles, extract relevant info.
+            lines = content.split("\n")
+            for line in lines:
+                if line.strip():
+                    articles.append(line.strip())
+        except Exception as e:
+            logging.error(f"Failed to parse articles: {e}")
+    return articles[:max_results]
 
-# Normal Response
-normal_response = make_perplexity_api_call(
-    api_key, 
-    "llama-3.1-sonar-small-128k-online", 
-    "Who is winning at the Olympics?",
-    stream=False
-)
-print(normal_response['choices'][0]['message']['content'])
+# Example Usage
+athlete_name = "Lionel Messi"
+articles = fetch_recent_articles(api_key, athlete_name)
+
+print(f"\nRecent Articles about {athlete_name}:\n")
+for i, article in enumerate(articles, 1):
+    print(f"{i}. {article}")
