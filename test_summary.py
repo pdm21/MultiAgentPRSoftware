@@ -33,25 +33,48 @@ class SummaryAgent:
         self.model = model.bind_tools(tools)
 
     def fetch_content(self, state):
-        """Fetches the content from the current URL and saves it to the state."""
-        url = state["urls"][state["current_index"]]
-        print(f"Fetching content from URL: {url}")  # Debug print statement
+        """Fetches content and sources using Tavily's get_search_context."""
+        query = state["urls"][state["current_index"]]
+        print(f"Fetching content from URL: {query}")
 
-        # Invoke the tool to get the content
-        response = self.tools['tavily_search_results_json'].invoke({"query": url})
-
-        # Check if response is a list and contains dictionaries with 'content'
-        if isinstance(response, list) and len(response) > 0 and isinstance(response[0], dict):
-            state["content"] = response[0].get("content", "")
-            print("Content successfully fetched:")
-            print(state["content"][:500])  # Print the first 500 characters for verification
-            print("Number of characters in content:", len(state["content"]))  # Print character count
-
-        else:
-            print("No content found or unexpected response structure.")
+        # Use get_search_context to retrieve context-rich content
+        try:
+            content = self.tools['tavily_search_results_json'].get_search_context(
+                query=query,
+                max_tokens=4000,  # Adjust token limit as needed
+                search_depth=3,  # Look deeper into the website
+                days=30,  # Focus on content from the past 30 days
+                max_results=5,  # Limit to 5 sources
+            )
+            state["content"] = content
+            print(f"Content successfully fetched ({len(content)} characters):")
+            print(content[:500])  # Print first 500 characters for verification
+        except Exception as e:
+            print(f"Error fetching content: {e}")
             state["content"] = ""
 
         return state
+
+    # def fetch_content(self, state):
+    #     """Fetches the content from the current URL and saves it to the state."""
+    #     url = state["urls"][state["current_index"]]
+    #     print(f"Fetching content from URL: {url}")  
+
+        
+    #     response = self.tools['tavily_search_results_json'].invoke({"query": url})
+
+        
+    #     if isinstance(response, list) and len(response) > 0 and isinstance(response[0], dict):
+    #         state["content"] = response[0].get("content", "")
+    #         print("Content successfully fetched:")
+    #         print(state["content"][:500])  
+    #         print("Number of characters in content:", len(state["content"]))  
+
+    #     else:
+    #         print("No content found or unexpected response structure.")
+    #         state["content"] = ""
+
+    #     return state
 
 
 
