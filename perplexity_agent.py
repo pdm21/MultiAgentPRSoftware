@@ -79,7 +79,6 @@ def fetch_recent_articles(api_key: str, athlete: str, max_results: int = 10) -> 
     if "choices" in response:
         content = response['choices'][0]['message']['content']
         try:
-            # Assuming the response is a plain-text list of articles, extract relevant info.
             lines = content.split("\n")
             for line in lines:
                 if line.strip():
