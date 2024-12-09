@@ -66,7 +66,7 @@ def _normal_response(url: str, payload: dict, headers: dict) -> Dict[str, Any]:
         logging.error(f"Normal request failed: {e}")
         return {"error": f"Request error: {str(e)}"}
 
-def fetch_recent_articles(api_key: str, athlete: str, max_results: int = 10) -> list:
+def fetch_recent_articles(api_key: str, athlete: str, max_results: int = 6) -> list:
     query = f"Find the {max_results} most recent articles about {athlete}."
     response = make_perplexity_api_call(
         api_key,
@@ -91,6 +91,5 @@ def fetch_recent_articles(api_key: str, athlete: str, max_results: int = 10) -> 
 athlete_name = "Lionel Messi"
 articles = fetch_recent_articles(api_key, athlete_name)
 
-print(f"\nRecent Articles about {athlete_name}:\n")
 for i, article in enumerate(articles, 1):
-    print(f"{i}. {article}")
+    print(f"{article}")
