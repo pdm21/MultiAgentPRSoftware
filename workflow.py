@@ -1,126 +1,122 @@
 from langgraph.graph import StateGraph, END
-from langgraph.tool import Tool
 from langchain_core.messages import AnyMessage, HumanMessage, ToolMessage
-import requests
-import json
-from typing import List, Dict
+from langchain_community.chat_models import ChatOpenAI
+from langchain_core.tools import Tool
+from typing import Annotated, TypedDict, Dict
+from perplexity_agent import PerplexityAPI
+import operator
+import os
+from uuid import uuid4
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
-# Tool 1: Perplexity API Tool
-class PerplexityTool(Tool):
+# Agent State definition
+class AgentState(TypedDict):
+    messages: Annotated[list[AnyMessage], operator.add]
+
+
+# PerplexityTool definition
+class PerplexityTool():
     def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.url = "https://api.perplexity.ai/chat/completions"
-        self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+        """
+        Initializes the PerplexityTool with the provided API key.
+
+        Args:
+            api_key (str): The API key for Perplexity API.
+        """
+        self.api_client = PerplexityAPI(api_key)
 
     def invoke(self, args: Dict):
-        athlete = args["athlete"]
-        query = f"Find the 10 most recent articles about {athlete}."
-        payload = {
-            "model": "llama-3.1-sonar-small-128k-online",
-            "messages": [{"role": "user", "content": query}],
-            "temperature": 0.2,
-            "max_tokens": 1000,
-            "stream": False
-        }
-        response = requests.post(self.url, json=payload, headers=self.headers)
-        response.raise_for_status()
-        content = response.json()['choices'][0]['message']['content']
-        return [line.strip() for line in content.split("\n") if line.strip()]
+        """
+        Fetches the most recent articles about a given query using PerplexityAPI.
+
+        Args:
+            args (Dict): A dictionary containing:
+                - "query" (str): The search query or topic.
+                - "num_articles" (int): The number of articles to fetch.
+
+        Returns:
+            list: A list of articles related to the query.
+        """
+        query = args.get("query")
+        num_articles = args.get("num_articles", 5)  # Default to 5 articles if not provided
+        return self.api_client.fetch_recent_articles(query, max_results=num_articles)
 
 
-# Tool 2: Summarization Tool
-class SummarizationTool(Tool):
-    def invoke(self, args: Dict):
-        links = args["links"]
-        summaries = {link: f"Summary for {link}" for link in links}  # Simulated summary
-        return summaries
-
-
-# Tool 3: Human-in-the-Loop Tool
-class HumanFilterTool(Tool):
-    def invoke(self, args: Dict):
-        summaries = args["summaries"]
-        kept_links = {}
-        for link, summary in summaries.items():
-            print(f"\nLink: {link}\nSummary: {summary}")
-            user_input = input("Keep this article? (y/n): ").strip().lower()
-            if user_input == "y":
-                kept_links[link] = summary
-        return kept_links
-
-
-# Tool 4: Sentiment Analysis Tool
-class SentimentTool(Tool):
-    def invoke(self, args: Dict):
-        summaries = args["summaries"]
-        sentiment = {}
-        for link, summary in summaries.items():
-            sentiment[link] = "positive" if "good" in summary.lower() else "negative"
-        return sentiment
-
-
-# Tool 5: Write-Up Tool
-class WriteUpTool(Tool):
-    def invoke(self, args: Dict):
-        sentiments = args["sentiments"]
-        positive_content = []
-        negative_content = []
-
-        for link, sentiment in sentiments.items():
-            if sentiment == "positive":
-                positive_content.append(link)
-            else:
-                negative_content.append(link)
-
-        positive_writeup = f"Positive Articles:\n" + "\n".join(positive_content)
-        negative_writeup = f"Negative Articles:\n" + "\n".join(negative_content)
-
-        return {
-            "positive": positive_writeup,
-            "negative": negative_writeup
-        }
-
-
-# Define the Graph
-class AthletePRAgent:
+# AthleteArticleAgent class
+class AthleteArticleAgent:
     def __init__(self, api_key: str):
-        self.graph = StateGraph()
+        """
+        Function: Initializes the AthleteArticleAgent.
+        Args:     api_key (str): API key for Perplexity API.
+        """
+        # Define tools
         self.perplexity_tool = PerplexityTool(api_key)
-        self.summarization_tool = SummarizationTool()
-        self.human_filter_tool = HumanFilterTool()
-        self.sentiment_tool = SentimentTool()
-        self.writeup_tool = WriteUpTool()
 
-        # Define the graph flow
-        self.graph.add_node("perplexity", self.perplexity_tool.invoke)
-        self.graph.add_node("summarization", self.summarization_tool.invoke)
-        self.graph.add_node("human_filter", self.human_filter_tool.invoke)
-        self.graph.add_node("sentiment", self.sentiment_tool.invoke)
-        self.graph.add_node("writeup", self.writeup_tool.invoke)
+        # Initialize the state graph
+        graph = StateGraph(AgentState)
 
-        self.graph.add_edge("perplexity", "summarization")
-        self.graph.add_edge("summarization", "human_filter")
-        self.graph.add_edge("human_filter", "sentiment")
-        self.graph.add_edge("sentiment", "writeup")
+        # Add nodes and edges for the graph
+        graph.add_node("llm", self.call_perplexity)
+        graph.add_edge("llm", END)
 
-        self.graph.set_entry_point("perplexity")
+        graph.set_entry_point("llm")
 
-    def run(self, athlete: str):
-        context = {"athlete": athlete}
-        return self.graph.execute(context)
+
+        # Compile the graph
+        self.graph = graph.compile()
+
+        """
+        Function: Calls the PerplexityTool with the query from the state.
+        Args:     state (AgentState): The current agent state.
+        Returns:  AgentState: Updated state with tool response.
+        """
+    def call_perplexity(self, state: AgentState):
+        
+        last_message = state["messages"][-1] if state["messages"] else None
+
+        if isinstance(last_message, HumanMessage):
+            query = last_message.content
+            articles = self.perplexity_tool.invoke({"query": query, "num_articles": 5})
+
+            tool_call_id = str(uuid4())
+            # Add tool response to the state
+            state["messages"].append(
+                ToolMessage(
+                    name="PerplexityTool",
+                    content="\n".join(articles),
+                    tool_call_id=tool_call_id
+                )
+            )
+        return state
+
+    def run(self, query: str):
+        """
+        Executes the graph to fetch articles.
+
+        Args:
+            query (str): The search query.
+
+        Returns:
+            list: The list of articles fetched by the tool.
+        """
+        state = {"messages": [HumanMessage(content=query)]}
+        final_state = self.graph.invoke(state)
+        return final_state["messages"]
 
 
 # Example Usage
 if __name__ == "__main__":
-    api_key = "your-perplexity-api-key"
-    agent = AthletePRAgent(api_key)
+    api_key = os.getenv('PERPLEXITY_API_KEY')
+    if not api_key:
+        raise ValueError("API key for Perplexity API is missing. Check your .env file.")
+
+    agent = AthleteArticleAgent(api_key)
     result = agent.run("Lionel Messi")
-    
-    print("\nMedia Sentiment Report:")
-    print(f"A report has been generated on your athlete.")
-    print(f"Here are the positive things that are being said: {result['positive']}")
-    print(f"Here are the negative things: {result['negative']}")
+
+    print("\nTool Messages:")
+    for message in result:
+        if isinstance(message, ToolMessage):
+            print(message.content)
