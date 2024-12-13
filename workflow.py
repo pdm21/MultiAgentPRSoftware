@@ -77,6 +77,10 @@ class AthleteArticleAgent:
         
         last_message = state["messages"][-1] if state["messages"] else None
 
+        # getting duplicates, trying to avoid this
+        if isinstance(last_message, ToolMessage) and last_message.name == "PerplexityTool":
+            return state
+
         if isinstance(last_message, HumanMessage):
             query = last_message.content
             articles = self.perplexity_tool.invoke({"query": query, "num_articles": 5})
