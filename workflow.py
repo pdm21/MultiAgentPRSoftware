@@ -20,26 +20,11 @@ class AgentState(TypedDict):
 # PerplexityTool definition
 class PerplexityTool():
     def __init__(self, api_key: str):
-        """
-        Initializes the PerplexityTool with the provided API key.
-
-        Args:
-            api_key (str): The API key for Perplexity API.
-        """
+        """Initializes the PerplexityTool with the provided API key."""
         self.api_client = PerplexityAPI(api_key)
 
     def invoke(self, args: Dict):
-        """
-        Fetches the most recent articles about a given query using PerplexityAPI.
-
-        Args:
-            args (Dict): A dictionary containing:
-                - "query" (str): The search query or topic.
-                - "num_articles" (int): The number of articles to fetch.
-
-        Returns:
-            list: A list of articles related to the query.
-        """
+        """Fetches the most recent articles about a given query using PerplexityAPI."""
         query = args.get("query")
         num_articles = args.get("num_articles", 5)  # Default to 5 articles if not provided
         return self.api_client.fetch_recent_articles(query, max_results=num_articles)
@@ -97,25 +82,13 @@ class AthleteArticleAgent:
         return state
 
     def run(self, query: str):
-        """
-        Executes the graph to fetch articles.
-
-        Args:
-            query (str): The search query.
-
-        Returns:
-            list: The list of articles fetched by the tool.
-        """
         state = {"messages": [HumanMessage(content=query)]}
         final_state = self.graph.invoke(state)
         return final_state["messages"]
 
 
-# Example Usage
 if __name__ == "__main__":
     api_key = os.getenv('PERPLEXITY_API_KEY')
-    if not api_key:
-        raise ValueError("API key for Perplexity API is missing. Check your .env file.")
 
     agent = AthleteArticleAgent(api_key)
     result = agent.run("Lionel Messi")
